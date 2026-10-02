@@ -64,10 +64,12 @@ Ask questions like *"open urgent tickets"*, *"how many billing tickets came in t
 *"tickets by priority"* or *"summarize the technical issues"*.
 
 ```
-question ──► LLM planner ──► JSON QueryPlan ──► Pydantic validation ──► repository query ──► answer
-                                                    │ invalid / off-topic                       ▲
-                                                    └──► 200 + "try e.g. …" hint                 │
-                                       summarize only: 2nd LLM call on the fetched tickets ─────┘
+question ─► LLM planner ─► JSON QueryPlan ─► Pydantic validation ─► repository query ─► results
+                                                │ invalid / off-topic                      │
+                                                └─► 200 + "try e.g. …" hint                ▼
+            chat reply ◄─ grounding check ◄─ LLM writes a reply from ONLY those results ◄──┘
+                              │ fails
+                              └─► templated answer built from the results
 ```
 
 The planner may only return this shape (anything else fails validation):
@@ -81,8 +83,9 @@ The planner may only return this shape (anything else fails validation):
 | `group_by` | `status`, `category`, `priority`, or `null` (stats; defaults to status) |
 | `limit` | 1–20, default 10 (larger requests are clamped) |
 
-Each reply shows the answer, the **filters used**, matching ticket cards, stats, and an
-**Open in list view** link that reapplies the same filters on `/tickets`.
+The UI is a chat: each reply is a short natural-language answer (ticket mentions like `#12`
+are links), plus a small **View in ticket list** link that reapplies the same filters on
+`/tickets`. The API still returns the plan, tickets and stats for other clients.
 
 ### Design rationale
 
@@ -90,20 +93,21 @@ Each reply shows the answer, the **filters used**, matching ticket cards, stats,
   database: injection, accidental writes, expensive or wrong joins, and queries that are hard to
   review. Here the model only *chooses values from a small, closed vocabulary*. Pydantic rejects
   anything outside it, group-by columns come from a whitelist, and the query itself is ordinary,
-  tested repository code. The worst a bad plan can do is return the wrong filter, which the UI
-  shows as chips so the user can spot it.
+  tested repository code. The worst a bad plan can do is apply the wrong filter, which
+  "View in ticket list" makes easy to check.
 - **Prompt injection:** the question is wrapped in `<question>` tags (tags inside it are
   neutralised) and the prompt says to treat it as data. Even if the model is fooled, its output
   must still validate as a read-only `QueryPlan`; off-topic or malicious questions get the hint.
-- **Grounding:** `list`, `count` and `stats` answers are built from templates over real query
-  results, so the numbers always come from the database rather than the model. For `summarize`
-  the second LLM call sees **only** the fetched tickets' `id`, `title` and `ai_summary`, and
-  must cite them as `#id`. A summary that cites nothing, or cites a ticket that was not fetched,
-  is discarded in favour of the templated list answer.
+- **Grounding:** the reply is written by a second LLM call that sees **only** the query results
+  (total, group counts and the fetched tickets' id, title, summary, status, priority and
+  category), never the database. The reply is then checked against those results: it may only
+  cite fetched tickets as `#id`, a summary must cite at least one, and otherwise it must state
+  the real total (or "no/none" for zero). If any check fails, a templated answer built straight
+  from the results is used instead, so numbers always come from the database.
 - **Failure modes:** any LLM error returns `None` instead of raising. An unusable plan is a
   `200` with example questions; an unreachable LLM is a `503` so the UI can offer a retry.
-- **Testability:** the planner/summarizer is a FastAPI dependency (`get_assistant_llm`), so the
-  tests swap in a fake and never call the network.
+- **Testability:** the planner and reply writer are one FastAPI dependency
+  (`get_assistant_llm`), so the tests swap in a fake and never call the network.
 
 ## API
 
@@ -127,7 +131,7 @@ curl -X POST http://localhost:8000/api/assistant/ask \
 
 ```json
 {
-  "answer": "There are 2 billing tickets from the last 7 days.",
+  "answer": "You've had 2 billing tickets in the last 7 days.",
   "plan": { "intent": "count", "category": "billing", "date_range": "last_7_days", "status": null,
             "priority": null, "q": null, "group_by": null, "limit": 10 },
   "tickets": [],
