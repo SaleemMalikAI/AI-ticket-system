@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 
+import { Footer } from "@/components/layout/Footer";
 import { Header } from "@/components/layout/Header";
 import { ToastProvider } from "@/components/ui/Toast";
 import { SITE_DESCRIPTION, SITE_NAME, SITE_URL } from "@/constants/site";
@@ -35,10 +36,12 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           Skip to content
         </a>
         <ToastProvider>
-          <Header />
-          <main id="main" className="mx-auto max-w-6xl px-4 py-8 sm:px-6 sm:py-10">
-            {children}
-          </main>
+          <div className="flex min-h-dvh flex-col">
+            <Header />
+            {/* each route group's layout renders <main id="main"> */}
+            <div className="flex-1">{children}</div>
+            <Footer />
+          </div>
         </ToastProvider>
       </body>
     </html>

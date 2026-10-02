@@ -24,7 +24,7 @@ export function DeleteTicketCard({ ticket }: { ticket: Ticket }) {
     try {
       await restApi.tickets.remove(ticket.id);
       toast({ tone: "success", title: MESSAGES.ticketDeleted(ticket.id) });
-      router.push(Links.HOME);
+      router.push(Links.TICKETS);
     } catch (e) {
       toast({ tone: "error", title: MESSAGES.deleteFailed, description: errorText(e) });
       setDeleting(false);

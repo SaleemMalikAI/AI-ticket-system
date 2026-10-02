@@ -20,7 +20,7 @@ import { AiAnalysisCard } from "./AiAnalysisCard";
 import { DeleteTicketCard } from "./DeleteTicketCard";
 import { TicketManagePanel } from "./TicketManagePanel";
 
-const BACK = { href: Links.HOME, label: "All tickets" };
+const BACK = { href: Links.TICKETS, label: "All tickets" };
 
 function DetailSkeleton() {
   return (
@@ -70,7 +70,7 @@ export function TicketDetailView({ id }: { id: string }) {
         title={`Ticket #${id} not found`}
         description="It may have been deleted, or the link is wrong."
         action={
-          <Link href={Links.HOME} className={buttonClasses("secondary")}>
+          <Link href={Links.TICKETS} className={buttonClasses("secondary")}>
             Back to tickets
           </Link>
         }

@@ -11,15 +11,17 @@ export const metadata = buildMetadata(Pages.NOT_FOUND);
 
 export default function NotFound() {
   return (
-    <EmptyState
-      icon={Compass}
-      title={PAGES[Pages.NOT_FOUND].title}
-      description={PAGES[Pages.NOT_FOUND].description}
-      action={
-        <Link href={Links.HOME} className={buttonClasses("secondary")}>
-          Back to tickets
-        </Link>
-      }
-    />
+    <main id="main" className="mx-auto max-w-6xl px-4 py-16 sm:px-6">
+      <EmptyState
+        icon={Compass}
+        title={PAGES[Pages.NOT_FOUND].title}
+        description={PAGES[Pages.NOT_FOUND].description}
+        action={
+          <Link href={Links.TICKETS} className={buttonClasses("secondary")}>
+            Back to tickets
+          </Link>
+        }
+      />
+    </main>
   );
 }

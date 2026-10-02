@@ -68,6 +68,15 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* anchored sections clear the sticky header */
+  [id] {
+    scroll-margin-top: 5rem;
+  }
+
   body {
     @apply min-h-dvh bg-background font-sans text-foreground antialiased;
     background-image: radial-gradient(
@@ -112,7 +121,20 @@
   }
 }
 
+/* faint grid behind the landing hero, fading out at the edges */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in oklab, var(--foreground) 6%, transparent) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, black, transparent);
+}
+
 @media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
   *,
   ::before,
   ::after {

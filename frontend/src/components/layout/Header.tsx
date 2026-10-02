@@ -5,14 +5,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import { buttonClasses } from "@/components/ui/Button";
+import { LANDING_NAV } from "@/constants/landing";
 import { Links } from "@/constants/links";
 import { PAGES, Pages } from "@/constants/pages";
 import { SITE_NAME } from "@/constants/site";
 
 export function Header() {
   const pathname = usePathname();
+  const onLanding = pathname === Links.HOME;
   const onNewTicket = pathname === Links.NEW_TICKET;
-  const onTickets = !onNewTicket && (pathname === Links.HOME || pathname.startsWith(`${Links.TICKETS}/`));
+  const onTickets =
+    !onNewTicket && (pathname === Links.TICKETS || pathname.startsWith(`${Links.TICKETS}/`));
 
   return (
     <header className="sticky top-0 z-40 border-b border-border/70 bg-surface/70 backdrop-blur-lg supports-[backdrop-filter]:bg-surface/60">
@@ -24,16 +27,33 @@ export function Header() {
           <span className="hidden sm:inline">{SITE_NAME}</span>
         </Link>
 
+        {onLanding && (
+          <ul className="hidden items-center gap-1 lg:flex">
+            {LANDING_NAV.map((item) => (
+              <li key={item.anchor}>
+                <a
+                  href={`#${item.anchor}`}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-muted transition hover:bg-surface-muted hover:text-foreground"
+                >
+                  {item.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <div className="flex items-center gap-1 sm:gap-2">
           <Link
-            href={Links.HOME}
+            href={Links.TICKETS}
             aria-current={onTickets ? "page" : undefined}
             className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
-              onTickets ? "bg-primary/10 text-primary dark:text-indigo-300" : "text-muted hover:bg-surface-muted hover:text-foreground"
+              onTickets
+                ? "bg-primary/10 text-primary dark:text-indigo-300"
+                : "text-muted hover:bg-surface-muted hover:text-foreground"
             }`}
           >
             <Inbox className="size-4" aria-hidden />
-            {PAGES[Pages.HOME].title}
+            {PAGES[Pages.TICKETS].title}
           </Link>
           {!onNewTicket && (
             <Link href={Links.NEW_TICKET} className={buttonClasses("primary", "sm")}>

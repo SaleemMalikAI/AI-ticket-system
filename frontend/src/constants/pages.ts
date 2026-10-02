@@ -5,6 +5,7 @@ import { Links } from "./links";
 /** Every page in the app. Add a page here first, then give it a config below. */
 export enum Pages {
   HOME = "HOME",
+  TICKETS = "TICKETS",
   NEW_TICKET = "NEW_TICKET",
   TICKET_DETAIL = "TICKET_DETAIL",
   NOT_FOUND = "NOT_FOUND",
@@ -17,11 +18,19 @@ export enum Pages {
 export const PAGES: Record<Pages, PageConfig> = {
   [Pages.HOME]: {
     link: Links.HOME,
+    title: "AI-powered support ticket triage",
+    description:
+      "Create support tickets and let AI write a summary and suggest the category and priority in seconds. You can override anything.",
+    indexable: true,
+    sitemap: { changeFrequency: "weekly", priority: 1 },
+  },
+  [Pages.TICKETS]: {
+    link: Links.TICKETS,
     title: "Tickets",
     description:
       "Browse and filter all support tickets by status, category and priority, with AI-generated summaries.",
     indexable: true,
-    sitemap: { changeFrequency: "daily", priority: 1 },
+    sitemap: { changeFrequency: "daily", priority: 0.9 },
   },
   [Pages.NEW_TICKET]: {
     link: Links.NEW_TICKET,

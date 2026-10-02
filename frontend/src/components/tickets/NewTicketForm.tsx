@@ -103,7 +103,7 @@ export function NewTicketForm() {
 
   function onCancel() {
     if (dirty) setConfirmDiscard(true);
-    else router.push(Links.HOME);
+    else router.push(Links.TICKETS);
   }
 
   return (
@@ -111,7 +111,7 @@ export function NewTicketForm() {
       <PageHeader
         title="New ticket"
         description="Describe the problem. AI will summarize it and triage it for you."
-        back={{ href: Links.HOME, label: "All tickets" }}
+        back={{ href: Links.TICKETS, label: "All tickets" }}
       />
 
       <form onSubmit={onSubmit} noValidate className="card space-y-6 sm:p-7">
@@ -212,7 +212,7 @@ export function NewTicketForm() {
         description={MESSAGES.confirmDiscardBody}
         confirmLabel="Discard"
         cancelLabel="Keep editing"
-        onConfirm={() => router.push(Links.HOME)}
+        onConfirm={() => router.push(Links.TICKETS)}
         onCancel={() => setConfirmDiscard(false)}
       />
     </div>
