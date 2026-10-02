@@ -2,13 +2,56 @@
 
 from collections.abc import Sequence
 from datetime import datetime
+from collections.abc import Sequence
+from datetime import datetime
 from typing import Any
 
+from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy import ColumnElement, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.constants.ticket import Category, Priority, Status
 from app.models.ticket import Ticket
+
+# Columns the assistant may group by (whitelist: never build SQL from user text)
+GROUPABLE_COLUMNS = {
+    "status": Ticket.status,
+    "category": Ticket.category,
+    "priority": Ticket.priority,
+}
+
+
+def _escape_like(text: str) -> str:
+    return text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+
+
+def build_filters(
+    *,
+    status: Status | None = None,
+    category: Category | None = None,
+    priority: Priority | None = None,
+    q: str | None = None,
+    created_after: datetime | None = None,
+) -> list[ColumnElement[bool]]:
+    filters: list[ColumnElement[bool]] = []
+    if status:
+        filters.append(Ticket.status == status)
+    if category:
+        filters.append(Ticket.category == category)
+    if priority:
+        filters.append(Ticket.priority == priority)
+    if q:
+        pattern = f"%{_escape_like(q)}%"
+        filters.append(
+            or_(
+                Ticket.title.ilike(pattern, escape="\\"),
+                Ticket.description.ilike(pattern, escape="\\"),
+                Ticket.ai_summary.ilike(pattern, escape="\\"),
+            )
+        )
+    if created_after:
+        filters.append(Ticket.created_at >= created_after)
+    return filters
 
 # Columns the assistant may group by (whitelist: never build SQL from user text)
 GROUPABLE_COLUMNS = {
@@ -72,9 +115,18 @@ class TicketRepository:
         priority: Priority | None = None,
         q: str | None = None,
         created_after: datetime | None = None,
+        status: Status | None = None,
+        category: Category | None = None,
+        priority: Priority | None = None,
+        q: str | None = None,
+        created_after: datetime | None = None,
         limit: int,
         offset: int = 0,
+        offset: int = 0,
     ) -> tuple[list[Ticket], int]:
+        filters = build_filters(
+            status=status, category=category, priority=priority, q=q, created_after=created_after
+        )
         filters = build_filters(
             status=status, category=category, priority=priority, q=q, created_after=created_after
         )
