@@ -21,3 +21,19 @@ async def test_list_filters(client, fake_ai, ticket_payload):
 
     assert (await client.get(ApiRoutes.TICKETS, params={"priority": "nope"})).status_code == 422
     assert (await client.get(ApiRoutes.TICKETS, params={"limit": 0})).status_code == 422
+
+
+async def test_list_text_search(client, ticket_payload):
+    await client.post(ApiRoutes.TICKETS, json=ticket_payload)
+    await client.post(
+        ApiRoutes.TICKETS,
+        json={"title": "Refund 100% please", "description": "I was charged twice for the Pro plan."},
+    )
+
+    res = (await client.get(ApiRoutes.TICKETS, params={"q": "charged TWICE"})).json()
+    assert [t["title"] for t in res["items"]] == ["Refund 100% please"]
+
+    # LIKE wildcards in the search text are matched literally
+    assert (await client.get(ApiRoutes.TICKETS, params={"q": "100%"})).json()["total"] == 1
+    assert (await client.get(ApiRoutes.TICKETS, params={"q": "%"})).json()["total"] == 1
+    assert (await client.get(ApiRoutes.TICKETS, params={"q": "x" * 101})).status_code == 422
