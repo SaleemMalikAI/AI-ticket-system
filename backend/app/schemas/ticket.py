@@ -2,12 +2,24 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from app.models import Category, Priority, Status
+from app.constants.messages import ErrorMessages
+from app.constants.ticket import (
+    DESCRIPTION_MAX_LENGTH,
+    DESCRIPTION_MIN_LENGTH,
+    LIST_DEFAULT_LIMIT,
+    LIST_MAX_LIMIT,
+    TITLE_MAX_LENGTH,
+    TITLE_MIN_LENGTH,
+    Category,
+    Priority,
+    Status,
+)
+from app.utilities.text import strip_not_blank
 
 
 class TicketCreate(BaseModel):
-    title: str = Field(min_length=3, max_length=200)
-    description: str = Field(min_length=10, max_length=5000)
+    title: str = Field(min_length=TITLE_MIN_LENGTH, max_length=TITLE_MAX_LENGTH)
+    description: str = Field(min_length=DESCRIPTION_MIN_LENGTH, max_length=DESCRIPTION_MAX_LENGTH)
     # Optional: if omitted, the AI suggestion is used (user override otherwise)
     category: Category | None = None
     priority: Priority | None = None
@@ -15,10 +27,7 @@ class TicketCreate(BaseModel):
     @field_validator("title", "description")
     @classmethod
     def strip_whitespace(cls, v: str) -> str:
-        v = v.strip()
-        if not v:
-            raise ValueError("must not be blank")
-        return v
+        return strip_not_blank(v)
 
 
 class TicketUpdate(BaseModel):
@@ -29,8 +38,18 @@ class TicketUpdate(BaseModel):
     @model_validator(mode="after")
     def at_least_one_field(self) -> "TicketUpdate":
         if self.status is None and self.category is None and self.priority is None:
-            raise ValueError("provide at least one of: status, category, priority")
+            raise ValueError(ErrorMessages.EMPTY_UPDATE)
         return self
+
+
+class TicketListParams(BaseModel):
+    """Query string of GET /api/tickets."""
+
+    status: Status | None = None
+    category: Category | None = None
+    priority: Priority | None = None
+    limit: int = Field(LIST_DEFAULT_LIMIT, ge=1, le=LIST_MAX_LIMIT)
+    offset: int = Field(0, ge=0)
 
 
 class TicketRead(BaseModel):
@@ -52,11 +71,3 @@ class TicketRead(BaseModel):
 class TicketList(BaseModel):
     items: list[TicketRead]
     total: int
-
-
-class AISuggestion(BaseModel):
-    """Validated shape of the LLM response."""
-
-    summary: str = Field(min_length=1, max_length=500)
-    category: Category
-    priority: Priority

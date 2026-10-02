@@ -12,11 +12,11 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 
+from app.api.dependencies import get_analyzer
+from app.constants import Category, Priority
 from app.database import Base, get_session
 from app.main import app
-from app.models import Category, Priority
 from app.schemas import AISuggestion
-from app.services.ai import get_analyzer
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 
@@ -27,14 +27,22 @@ class FakeAnalyzer:
     def __init__(self):
         self.result: AISuggestion | None = AISuggestion(
             summary="User cannot log in after password reset.",
-            category=Category.account,
-            priority=Priority.high,
+            category=Category.ACCOUNT,
+            priority=Priority.HIGH,
         )
         self.calls = 0
 
     async def analyze(self, title: str, description: str) -> AISuggestion | None:
         self.calls += 1
         return self.result
+
+
+@pytest.fixture
+def ticket_payload() -> dict[str, str]:
+    return {
+        "title": "Cannot log in",
+        "description": "After resetting my password I get 'invalid credentials' every time.",
+    }
 
 
 @pytest.fixture

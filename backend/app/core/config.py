@@ -9,10 +9,13 @@ class Settings(BaseSettings):
     # Reads the repo-root .env when run from backend/ (real env vars always win)
     model_config = SettingsConfigDict(env_file=("../.env", ".env"), extra="ignore")
 
+    app_name: str = "AI Support Tickets API"
+    app_version: str = "1.0.0"
+
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/tickets"
 
     # LLM provider (Groq exposes an OpenAI-compatible API)
-    llm_api_key: str = ""
+    llm_api_key: str = "" 
     llm_base_url: str = "https://api.groq.com/openai/v1"
     llm_model: str = "openai/gpt-oss-20b"
     llm_timeout_seconds: float = 10.0

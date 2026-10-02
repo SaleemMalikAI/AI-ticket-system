@@ -1,63 +1,33 @@
-import logging
-import time
+"""Application entry point: `uvicorn app.main:app`."""
 
-from fastapi import FastAPI, Request, status
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
-from app.config import get_settings
-from app.database import SessionLocal
-from app.logging_config import setup_logging
-from app.routers import tickets
+from fastapi import FastAPI
 
-settings = get_settings()
-setup_logging(settings.log_level)
-logger = logging.getLogger("app")
-
-app = FastAPI(title="AI Support Tickets API", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+from app.api.router import api_router
+from app.core.config import get_settings
+from app.core.logging_config import setup_logging
+from app.database.connection import engine
+from app.exceptions.handlers import register_exception_handlers
+from app.middleware import register_middleware
 
 
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    start = time.perf_counter()
-    response = await call_next(request)
-    ms = (time.perf_counter() - start) * 1000
-    logger.info("%s %s -> %s (%.1fms)", request.method, request.url.path, response.status_code, ms)
-    return response
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    yield
+    await engine.dispose()  # close pooled DB connections on shutdown
 
 
-@app.exception_handler(SQLAlchemyError)
-async def db_error_handler(request: Request, exc: SQLAlchemyError):
-    logger.exception("Database error on %s %s", request.method, request.url.path)
-    return JSONResponse(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        content={"detail": "Database error, please try again later"},
-    )
+def create_app() -> FastAPI:
+    settings = get_settings()
+    setup_logging(settings.log_level)
+
+    app = FastAPI(title=settings.app_name, version=settings.app_version, lifespan=lifespan)
+    register_middleware(app, settings)
+    register_exception_handlers(app)
+    app.include_router(api_router)
+    return app
 
 
-@app.exception_handler(Exception)
-async def unhandled_error_handler(request: Request, exc: Exception):
-    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Internal server error"},
-    )
-
-
-@app.get("/health", tags=["health"])
-async def health():
-    async with SessionLocal() as session:
-        await session.execute(text("SELECT 1"))
-    return {"status": "ok"}
-
-
-app.include_router(tickets.router)
+app = create_app()

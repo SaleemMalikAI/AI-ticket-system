@@ -12,21 +12,17 @@ from typing import Protocol
 import httpx
 from pydantic import ValidationError
 
-from app.config import Settings, get_settings
-from app.models import Category, Priority
-from app.schemas import AISuggestion
+from app.constants.ai import (
+    LLM_CHAT_COMPLETIONS_PATH,
+    LLM_RESPONSE_FORMAT,
+    LLM_TEMPERATURE,
+    SYSTEM_PROMPT,
+)
+from app.core.config import Settings
+from app.schemas.ai import AISuggestion
+from app.utilities.text import normalize_choice
 
 logger = logging.getLogger(__name__)
-
-SYSTEM_PROMPT = f"""You triage customer support tickets.
-Return ONLY a JSON object with exactly these keys:
-- "summary": one sentence, max 25 words, describing the user's problem
-- "category": one of {[c.value for c in Category]}
-- "priority": one of {[p.value for p in Priority]}
-
-Priority guide: urgent = outage, data loss, security or payment failure for many users;
-high = a core feature is broken for this user; medium = degraded or partial issue;
-low = question, cosmetic issue or feature request."""
 
 
 class TicketAnalyzer(Protocol):
@@ -41,7 +37,7 @@ def parse_suggestion(raw: str) -> AISuggestion | None:
             # be lenient with casing / spaces the model might add
             for key in ("category", "priority"):
                 if isinstance(data.get(key), str):
-                    data[key] = data[key].strip().lower().replace(" ", "_")
+                    data[key] = normalize_choice(data[key])
         return AISuggestion.model_validate(data)
     except (json.JSONDecodeError, ValidationError) as exc:
         logger.warning("AI returned invalid output: %s", exc)
@@ -59,8 +55,8 @@ class LLMTicketAnalyzer:
 
         payload = {
             "model": self.settings.llm_model,
-            "temperature": 0.2,
-            "response_format": {"type": "json_object"},
+            "temperature": LLM_TEMPERATURE,
+            "response_format": LLM_RESPONSE_FORMAT,
             "messages": [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Title: {title}\n\nDescription: {description}"},
@@ -69,7 +65,7 @@ class LLMTicketAnalyzer:
         try:
             async with httpx.AsyncClient(timeout=self.settings.llm_timeout_seconds) as client:
                 resp = await client.post(
-                    f"{self.settings.llm_base_url}/chat/completions",
+                    f"{self.settings.llm_base_url}{LLM_CHAT_COMPLETIONS_PATH}",
                     headers={"Authorization": f"Bearer {self.settings.llm_api_key}"},
                     json=payload,
                 )
@@ -87,8 +83,3 @@ class LLMTicketAnalyzer:
                 suggestion.priority.value,
             )
         return suggestion
-
-
-def get_analyzer() -> TicketAnalyzer:
-    """FastAPI dependency (overridden with a fake in tests)."""
-    return LLMTicketAnalyzer(get_settings())
