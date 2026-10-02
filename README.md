@@ -1,6 +1,6 @@
 # AI-ticket-system
 
-Support ticket management with AI triage. Every new ticket gets a one-line AI summary plus a
+Support ticket management with AI triage. Every new ticket gets a 3–5 sentence AI summary plus a
 suggested category and priority (which people can override), and an **Ask AI** assistant answers
 questions about the ticket queue in plain English.
 
@@ -48,7 +48,8 @@ cd frontend && npm run lint && npm run build
 
 ## Features
 
-- **AI triage on create:** summary + suggested category/priority. User choices always win, and the
+- **AI triage on create:** a 3–5 sentence summary (problem, impact, key details, what the
+  customer wants) + suggested category/priority. User choices always win, and the
   AI suggestion is stored separately so overrides stay visible. If the LLM fails, the ticket is
   still created with defaults (General / Medium).
 - **Ticket list:** filter by status, category, priority and free-text search (`q`); filters live
