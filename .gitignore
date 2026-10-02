@@ -1,6 +1,8 @@
 # secrets
 .env
 .env.*
+# ...but the sanitized template is safe to track
+!.env.example
 
 # python
 __pycache__/
