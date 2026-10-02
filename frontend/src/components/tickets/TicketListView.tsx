@@ -53,12 +53,15 @@ export function TicketListView() {
     load();
   }, [load]);
 
-  function setFilter(key: string, value: string) {
-    const params = new URLSearchParams(searchParams.toString());
-    if (value) params.set(key, value);
-    else params.delete(key);
-    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
-  }
+  const setFilter = useCallback(
+    (key: string, value: string) => {
+      const params = new URLSearchParams(queryKey);
+      if (value) params.set(key, value);
+      else params.delete(key);
+      router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
+    },
+    [queryKey, pathname, router],
+  );
 
   const clearFilters = () => router.replace(pathname, { scroll: false });
 
@@ -81,7 +84,7 @@ export function TicketListView() {
           <EmptyState
             icon={SearchX}
             title="No matching tickets"
-            description="Nothing matches these filters. Try a different status, category or priority."
+            description="Nothing matches these filters. Try other search words, or a different status, category or priority."
             action={
               <Button variant="secondary" icon={<X />} onClick={clearFilters}>
                 Clear filters
