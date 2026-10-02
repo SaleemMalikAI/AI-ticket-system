@@ -168,3 +168,61 @@ async def test_ai_unavailable_returns_503(client, fake_assistant):
 @pytest.mark.parametrize("question", ["", "  ", "hi", "x" * 301])
 async def test_question_validation(client, question):
     assert (await ask(client, question)).status_code == 422
+
+
+DRAFT = {
+    "title": "CSV export never finishes",
+    "description": "Clicking Export on the Reports page shows a spinner forever and no file downloads.",
+    "category": "Technical",
+    "priority": "high",
+}
+
+
+async def test_create_returns_a_draft_without_creating_a_ticket(client, fake_assistant, seeded):
+    fake_assistant.plan = {"intent": "create"}
+    fake_assistant.draft = DRAFT
+
+    res = await ask(client, "create a ticket: the CSV export hangs forever")
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["plan"]["intent"] == "create"
+    assert body["draft"] == {**DRAFT, "category": "technical"}  # normalised
+    assert "draft" in body["answer"].lower()
+    assert body["tickets"] == []
+    # nothing was written: the user has to confirm the draft first
+    assert (await client.get(ApiRoutes.TICKETS)).json()["total"] == len(seeded)
+
+
+async def test_confirmed_draft_creates_ticket_via_normal_endpoint(client, fake_assistant):
+    fake_assistant.plan = {"intent": "create"}
+    fake_assistant.draft = DRAFT
+    draft = (await ask(client, "file a ticket about the export")).json()["draft"]
+
+    res = await client.post(ApiRoutes.TICKETS, json=draft)
+
+    assert res.status_code == 201
+    assert res.json()["title"] == DRAFT["title"]
+    assert res.json()["category"] == "technical"
+
+
+@pytest.mark.parametrize(
+    "draft",
+    [
+        None,  # drafting LLM failed
+        "not json",
+        '{"title": null}',  # model found nothing to file
+        {**DRAFT, "description": "short"},
+        {**DRAFT, "priority": "whenever"},
+    ],
+)
+async def test_unusable_draft_asks_for_more_detail(client, fake_assistant, draft):
+    fake_assistant.plan = {"intent": "create"}
+    fake_assistant.draft = draft
+
+    res = await ask(client, "create a ticket")
+
+    assert res.status_code == 200
+    body = res.json()
+    assert body["draft"] is None
+    assert "Describe the problem" in body["answer"]

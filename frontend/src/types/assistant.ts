@@ -2,7 +2,7 @@
 
 import type { Category, Priority, Status, Ticket } from "./ticket";
 
-export type AssistantIntent = "list" | "count" | "stats" | "summarize";
+export type AssistantIntent = "list" | "count" | "stats" | "summarize" | "create";
 export type DateRange = "today" | "last_7_days" | "last_30_days";
 export type GroupBy = "status" | "category" | "priority";
 
@@ -18,6 +18,14 @@ export interface QueryPlan {
   limit: number;
 }
 
+/** A ticket the AI proposes (intent "create"). Nothing is saved until the user confirms it. */
+export interface TicketDraft {
+  title: string;
+  description: string;
+  category: Category;
+  priority: Priority;
+}
+
 export interface AskRequest {
   question: string;
 }
@@ -29,4 +37,6 @@ export interface AskResponse {
   tickets: Ticket[];
   /** counts per group for intent "stats", e.g. { open: 3, closed: 1 } */
   stats: Record<string, number> | null;
+  /** intent "create": the drafted ticket, shown as a card for the user to confirm */
+  draft: TicketDraft | null;
 }

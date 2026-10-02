@@ -8,4 +8,5 @@ export const SUGGESTED_QUESTIONS = [
   "Break down tickets by category",
   "Summarize the technical issues",
   "Any tickets about refunds?",
+  "Create a ticket: the CSV export never finishes",
 ] as const;

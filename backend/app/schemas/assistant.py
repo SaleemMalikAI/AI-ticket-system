@@ -11,7 +11,16 @@ from app.constants.assistant import (
     DateRange,
     GroupBy,
 )
-from app.constants.ticket import SEARCH_MAX_LENGTH, Category, Priority, Status
+from app.constants.ticket import (
+    DESCRIPTION_MAX_LENGTH,
+    DESCRIPTION_MIN_LENGTH,
+    SEARCH_MAX_LENGTH,
+    TITLE_MAX_LENGTH,
+    TITLE_MIN_LENGTH,
+    Category,
+    Priority,
+    Status,
+)
 from app.schemas.ticket import TicketRead
 from app.utilities.text import normalize_choice, strip_not_blank
 
@@ -61,6 +70,28 @@ class QueryPlan(BaseModel):
         return v
 
 
+class TicketDraft(BaseModel):
+    """A ticket the AI proposes from a chat message. Nothing is saved until the user
+    confirms it, which goes through the normal POST /api/tickets endpoint."""
+
+    model_config = ConfigDict(extra="ignore")
+
+    title: str = Field(min_length=TITLE_MIN_LENGTH, max_length=TITLE_MAX_LENGTH)
+    description: str = Field(min_length=DESCRIPTION_MIN_LENGTH, max_length=DESCRIPTION_MAX_LENGTH)
+    category: Category
+    priority: Priority
+
+    @field_validator("title", "description", mode="before")
+    @classmethod
+    def strip_text(cls, v: Any) -> Any:
+        return v.strip() if isinstance(v, str) else v
+
+    @field_validator("category", "priority", mode="before")
+    @classmethod
+    def normalize_choice_fields(cls, v: Any) -> Any:
+        return normalize_choice(v) if isinstance(v, str) else v
+
+
 class AskRequest(BaseModel):
     question: str = Field(min_length=QUESTION_MIN_LENGTH, max_length=QUESTION_MAX_LENGTH)
 
@@ -75,3 +106,4 @@ class AskResponse(BaseModel):
     plan: QueryPlan | None = None  # None when the question could not be turned into a plan
     tickets: list[TicketRead] = []
     stats: dict[str, int] | None = None  # {"open": 3, ...} for intent "stats"
+    draft: TicketDraft | None = None  # intent "create": a ticket for the user to confirm

@@ -6,6 +6,9 @@ results into a conversational reply -> the reply is checked against them.
 
 The LLM never writes SQL. The reply must use the real total and may only cite
 tickets that were fetched; otherwise a templated answer is used instead.
+
+For intent "create" the LLM only drafts a ticket. Nothing is written here: the
+user confirms the draft in the UI, which calls the normal create endpoint.
 """
 
 import json
@@ -19,6 +22,7 @@ from pydantic import ValidationError
 from app.constants.assistant import (
     DEFAULT_GROUP_BY,
     ANSWER_SYSTEM_PROMPT,
+    DRAFT_SYSTEM_PROMPT,
     PLANNER_SYSTEM_PROMPT,
     AssistantIntent,
     AssistantMessages,
@@ -29,7 +33,7 @@ from app.core.config import Settings
 from app.exceptions.errors import AIUnavailableError
 from app.models.ticket import Ticket
 from app.repositories.ticket_repository import TicketRepository, build_filters
-from app.schemas.assistant import AskResponse, QueryPlan
+from app.schemas.assistant import AskResponse, QueryPlan, TicketDraft
 from app.schemas.ticket import TicketRead
 from app.services.llm_client import chat_completion
 from app.utilities.dates import date_range_start
@@ -52,6 +56,8 @@ class AssistantLLM(Protocol):
     async def plan_query(self, question: str) -> str | None: ...
 
     async def compose_answer(self, question: str, facts: dict) -> str | None: ...
+
+    async def draft_ticket(self, question: str) -> str | None: ...
 
 
 def wrap_question(question: str) -> str:
@@ -89,12 +95,33 @@ class GroqAssistantLLM:
         )
 
 
+    async def draft_ticket(self, question: str) -> str | None:
+        return await chat_completion(
+            self.settings,
+            [
+                {"role": "system", "content": DRAFT_SYSTEM_PROMPT},
+                {"role": "user", "content": wrap_question(question)},
+            ],
+        )
+
+
 def parse_plan(raw: str) -> QueryPlan | None:
     """Validate the planner's JSON. Returns None if it is not a usable plan."""
     try:
         return QueryPlan.model_validate_json(raw)
     except ValidationError as exc:
         logger.warning("Assistant returned an invalid plan: %s", exc.errors(include_url=False))
+        return None
+
+
+def parse_draft(raw: str | None) -> TicketDraft | None:
+    """Validate the drafted ticket. Returns None if the LLM failed or the draft is unusable."""
+    if raw is None:
+        return None
+    try:
+        return TicketDraft.model_validate_json(raw)
+    except ValidationError as exc:
+        logger.warning("Assistant returned an invalid draft: %s", exc.errors(include_url=False))
         return None
 
 
@@ -160,6 +187,9 @@ class AssistantService:
         if plan is None:
             return AskResponse(answer=AssistantMessages.FALLBACK)
 
+        if plan.intent is AssistantIntent.CREATE:
+            return await self.draft(question, plan)
+
         result = await self.execute_plan(plan)
         answer = await self.build_answer(question, plan, result)
         logger.info("Assistant answered intent=%s total=%s", plan.intent.value, result.total)
@@ -169,6 +199,18 @@ class AssistantService:
             tickets=[TicketRead.model_validate(t) for t in result.tickets],
             stats=result.stats,
         )
+
+    async def draft(self, question: str, plan: QueryPlan) -> AskResponse:
+        """Propose a ticket for the user to confirm. Never writes to the database."""
+        draft = parse_draft(await self.llm.draft_ticket(question))
+        if draft is None:
+            return AskResponse(answer=AssistantMessages.DRAFT_FAILED, plan=plan)
+        logger.info(
+            "Assistant drafted a ticket category=%s priority=%s",
+            draft.category.value,
+            draft.priority.value,
+        )
+        return AskResponse(answer=AssistantMessages.DRAFT_READY, plan=plan, draft=draft)
 
     async def execute_plan(self, plan: QueryPlan) -> PlanResult:
         filters = {

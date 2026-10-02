@@ -16,6 +16,8 @@ export const MESSAGES = {
   ticketDeleted: (id: number) => `Ticket #${id} deleted`,
   deleteFailed: "Could not delete the ticket",
 
+  draftCreateFailed: "Could not create the ticket from this draft",
+
   confirmDiscardTitle: "Discard this ticket?",
   confirmDiscardBody: "You have unsaved text. If you leave now it will be lost.",
 } as const;

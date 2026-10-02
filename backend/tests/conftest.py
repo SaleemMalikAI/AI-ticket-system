@@ -43,12 +43,14 @@ class FakeAssistantLLM:
 
     `plan` is what plan_query returns: a dict (sent as JSON), a raw string,
     or None (= LLM unavailable). `reply` is what compose_answer returns;
-    None makes the service fall back to its templated answer.
+    None makes the service fall back to its templated answer. `draft` is what
+    draft_ticket returns (dict sent as JSON, raw string, or None).
     """
 
     def __init__(self):
         self.plan: dict | str | None = {"intent": "list"}
         self.reply: str | None = None
+        self.draft: dict | str | None = None
         self.questions: list[str] = []
         self.facts: dict | None = None
 
@@ -59,6 +61,9 @@ class FakeAssistantLLM:
     async def compose_answer(self, question: str, facts: dict) -> str | None:
         self.facts = facts
         return self.reply
+
+    async def draft_ticket(self, question: str) -> str | None:
+        return json.dumps(self.draft) if isinstance(self.draft, dict) else self.draft
 
 
 @pytest.fixture

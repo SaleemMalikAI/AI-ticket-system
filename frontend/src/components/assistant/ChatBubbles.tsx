@@ -7,6 +7,7 @@ import type { AskResponse } from "@/types/assistant";
 import { buildListLink } from "@/utilities/assistant";
 
 import { AnswerText } from "./AnswerText";
+import { DraftTicketCard } from "./DraftTicketCard";
 import { SuggestedQuestions } from "./SuggestedQuestions";
 
 function AiAvatar() {
@@ -80,16 +81,20 @@ interface AnswerProps {
   disabled: boolean;
 }
 
-/** A chat reply: the AI's natural-language answer, nothing else to read through. */
+/** A chat reply: the AI's natural-language answer (plus a draft ticket card when creating). */
 export function AnswerBubble({ response, onPick, disabled }: AnswerProps) {
-  const { answer, plan } = response;
+  const { answer, plan, draft } = response;
 
   return (
     <AiRow label="AI answer">
-      <div className="w-fit max-w-full space-y-3 rounded-2xl rounded-tl-md border border-border bg-surface px-4 py-3 shadow-sm sm:px-5">
+      <div
+        className={`${draft ? "w-full" : "w-fit"} max-w-full space-y-3 rounded-2xl rounded-tl-md border border-border bg-surface px-4 py-3 shadow-sm sm:px-5`}
+      >
         <AnswerText text={answer} />
 
-        {plan ? (
+        {draft && <DraftTicketCard draft={draft} />}
+
+        {plan && plan.intent !== "create" && (
           <Link
             href={buildListLink(plan)}
             className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline dark:text-indigo-300"
@@ -97,10 +102,10 @@ export function AnswerBubble({ response, onPick, disabled }: AnswerProps) {
             View in ticket list
             <ArrowUpRight className="size-3.5" aria-hidden />
           </Link>
-        ) : (
-          // the question could not be planned: offer examples that work
-          <SuggestedQuestions onPick={onPick} disabled={disabled} className="border-t border-border pt-3" />
         )}
+
+        {/* the question could not be planned: offer examples that work */}
+        {!plan && <SuggestedQuestions onPick={onPick} disabled={disabled} className="border-t border-border pt-3" />}
       </div>
     </AiRow>
   );

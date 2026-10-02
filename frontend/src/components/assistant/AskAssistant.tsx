@@ -70,7 +70,7 @@ export function AskAssistant() {
             {PAGES[Pages.ASK].title}
           </span>
         }
-        description="Ask about your tickets in plain English. The AI turns your question into filters; it never touches the database directly."
+        description="Ask about your tickets in plain English, or ask it to create one. The AI never touches the database directly: it turns questions into filters and drafts tickets for you to confirm."
       />
 
       {messages.length === 0 && !loading ? (
@@ -80,7 +80,7 @@ export function AskAssistant() {
           </span>
           <h2 className="mt-4 text-lg font-semibold">What would you like to know?</h2>
           <p className="mt-1 max-w-md text-sm text-muted">
-            List, count, break down or summarize tickets. Try one of these:
+            List, count, break down or summarize tickets, or describe a problem to create a new one. Try:
           </p>
           <SuggestedQuestions onPick={ask} disabled={loading} className="mt-6 justify-center" />
         </div>
