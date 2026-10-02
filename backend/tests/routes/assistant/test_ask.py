@@ -82,27 +82,56 @@ async def test_text_search_and_date_range(client, fake_assistant, seeded):
     assert body["answer"] == 'Found 1 ticket matching "site" from the last 7 days.'
 
 
-async def test_summarize_cites_fetched_tickets(client, fake_assistant, seeded):
+async def test_conversational_reply_is_used_when_grounded(client, fake_assistant, seeded):
     urgent_ids = sorted(t["id"] for t in seeded if t["priority"] == "urgent")
-    fake_assistant.plan = {"intent": "summarize", "priority": "urgent"}
-    fake_assistant.summary = f"Two urgent issues: a double charge (#{urgent_ids[0]}) and an outage (#{urgent_ids[1]})."
+    fake_assistant.plan = {"intent": "list", "priority": "urgent"}
+    fake_assistant.reply = (
+        f"You have 2 urgent tickets right now: a double charge (#{urgent_ids[0]}) "
+        f"and a site outage (#{urgent_ids[1]})."
+    )
 
-    body = (await ask(client, "summarize urgent tickets")).json()
+    body = (await ask(client, "anything urgent?")).json()
 
-    assert body["answer"] == fake_assistant.summary
-    assert sorted(fake_assistant.summarized_ids) == urgent_ids  # only the fetched tickets
+    assert body["answer"] == fake_assistant.reply
+    # the writer only ever sees the query results
+    assert fake_assistant.facts["total"] == 2
+    assert sorted(t["id"] for t in fake_assistant.facts["tickets"]) == urgent_ids
 
 
-@pytest.mark.parametrize("summary", ["No citations at all.", "See #9999.", None])
-async def test_summarize_falls_back_when_ungrounded(client, fake_assistant, seeded, summary):
+async def test_count_reply_must_use_the_real_number(client, fake_assistant, seeded):
+    fake_assistant.plan = {"intent": "count", "category": "billing"}
+
+    fake_assistant.reply = "Looks like you have 2 billing tickets at the moment."
+    assert (await ask(client)).json()["answer"] == fake_assistant.reply
+
+    fake_assistant.reply = "You have about 7 billing tickets."  # wrong number
+    assert (await ask(client)).json()["answer"] == "There are 2 billing tickets."
+
+
+async def test_summary_must_cite_fetched_tickets(client, fake_assistant, seeded):
+    technical = next(t for t in seeded if t["category"] == "technical")
     fake_assistant.plan = {"intent": "summarize", "category": "technical"}
-    fake_assistant.summary = summary
 
-    body = (await ask(client)).json()
+    fake_assistant.reply = f"The only technical issue is a site outage (#{technical['id']})."
+    assert (await ask(client)).json()["answer"] == fake_assistant.reply
 
-    assert body["answer"].startswith("Found 1 technical ticket.")
-    assert "summary was unavailable" in body["answer"]
-    assert len(body["tickets"]) == 1
+
+@pytest.mark.parametrize("reply", ["The site is down for everyone.", "See #9999 for details.", None])
+async def test_ungrounded_summary_falls_back(client, fake_assistant, seeded, reply):
+    fake_assistant.plan = {"intent": "summarize", "category": "technical"}
+    fake_assistant.reply = reply
+
+    answer = (await ask(client)).json()["answer"]
+
+    assert answer.startswith("Found 1 technical ticket.")
+    assert "summary was unavailable" in answer
+
+
+async def test_empty_result_reply(client, fake_assistant, seeded):
+    fake_assistant.plan = {"intent": "list", "status": "closed"}
+    fake_assistant.reply = "Good news: there are no closed tickets yet."
+
+    assert (await ask(client)).json()["answer"] == fake_assistant.reply
 
 
 @pytest.mark.parametrize(
