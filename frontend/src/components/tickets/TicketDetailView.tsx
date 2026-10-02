@@ -1,27 +1,48 @@
 "use client";
 
+import { Clock, History, SearchX } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Badge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { CategoryBadge, PriorityBadge, StatusBadge } from "@/components/ui/Badge";
+import { buttonClasses } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBox } from "@/components/ui/ErrorBox";
-import { Select } from "@/components/ui/Select";
+import { Skeleton } from "@/components/ui/Skeleton";
 import { Links } from "@/constants/links";
-import { CATEGORIES, PRIORITIES, STATUSES } from "@/constants/ticket";
 import { ApiError, restApi } from "@/rest-api";
-import type { Ticket, TicketUpdate } from "@/types/ticket";
+import type { Ticket } from "@/types/ticket";
 import { errorText } from "@/utilities/errors";
-import { formatDateTime, label } from "@/utilities/format";
+import { formatDateTime, formatRelative } from "@/utilities/format";
+
+import { AiAnalysisCard } from "./AiAnalysisCard";
+import { DeleteTicketCard } from "./DeleteTicketCard";
+import { TicketManagePanel } from "./TicketManagePanel";
+
+const BACK = { href: Links.HOME, label: "All tickets" };
+
+function DetailSkeleton() {
+  return (
+    <div className="space-y-6" aria-label="Loading ticket">
+      <Skeleton className="h-4 w-24" />
+      <Skeleton className="h-9 w-2/3" />
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <Skeleton className="h-44 rounded-2xl" />
+          <Skeleton className="h-36 rounded-2xl" />
+        </div>
+        <Skeleton className="h-80 rounded-2xl" />
+      </div>
+    </div>
+  );
+}
 
 export function TicketDetailView({ id }: { id: string }) {
-  const router = useRouter();
-
   const [ticket, setTicket] = useState<Ticket | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -40,120 +61,85 @@ export function TicketDetailView({ id }: { id: string }) {
     load();
   }, [load]);
 
-  async function update(patch: TicketUpdate) {
-    if (!ticket) return;
-    setSaving(true);
-    setError(null);
-    try {
-      setTicket(await restApi.tickets.update(ticket.id, patch));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function remove() {
-    if (!ticket || !confirm(`Delete ticket #${ticket.id}?`)) return;
-    setSaving(true);
-    try {
-      await restApi.tickets.remove(ticket.id);
-      router.push(Links.HOME);
-    } catch (e) {
-      setError(errorText(e));
-      setSaving(false);
-    }
-  }
-
-  if (loading && !ticket) return <p className="text-sm text-slate-500">Loading ticket…</p>;
+  if (loading && !ticket) return <DetailSkeleton />;
 
   if (notFound)
     return (
-      <div className="card text-center">
-        <p>Ticket #{id} was not found.</p>
-        <Link href={Links.HOME} className="mt-2 inline-block text-sm underline">
-          Back to tickets
-        </Link>
+      <EmptyState
+        icon={SearchX}
+        title={`Ticket #${id} not found`}
+        description="It may have been deleted, or the link is wrong."
+        action={
+          <Link href={Links.HOME} className={buttonClasses("secondary")}>
+            Back to tickets
+          </Link>
+        }
+      />
+    );
+
+  if (!ticket)
+    return (
+      <div className="space-y-6">
+        <PageHeader title="Ticket" back={BACK} />
+        <ErrorBox message={error ?? "Something went wrong"} onRetry={load} />
       </div>
     );
 
-  if (!ticket) return <ErrorBox message={error ?? "Something went wrong"} onRetry={load} />;
-
-  const overridden = (value: string, ai: string | null) => ai !== null && ai !== value;
+  const edited = ticket.updated_at !== ticket.created_at;
 
   return (
-    <div className="space-y-6">
-      <Link href={Links.HOME} className="text-sm text-slate-500 hover:text-slate-900">
-        ← All tickets
-      </Link>
-
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold">
-            <span className="text-slate-400">#{ticket.id}</span> {ticket.title}
-          </h1>
-          <p className="mt-1 text-xs text-slate-500">Created {formatDateTime(ticket.created_at)}</p>
-        </div>
-        <div className="flex gap-2">
-          <Badge value={ticket.status} />
-          <Badge value={ticket.priority} />
-          <Badge value={ticket.category} />
-        </div>
-      </div>
-
-      {error && <ErrorBox message={error} />}
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <div className="space-y-6 md:col-span-2">
-          <section className="card border-violet-200 bg-violet-50/40">
-            <h2 className="mb-2 text-sm font-semibold text-violet-900">✨ AI analysis</h2>
-            {ticket.ai_summary ? (
-              <>
-                <p className="text-sm">{ticket.ai_summary}</p>
-                <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <dt className="text-slate-500">Suggested category</dt>
-                    <dd className="font-medium">
-                      {label(ticket.ai_category!)}
-                      {overridden(ticket.category, ticket.ai_category) && (
-                        <span className="ml-1 text-amber-700">(overridden)</span>
-                      )}
-                    </dd>
-                  </div>
-                  <div>
-                    <dt className="text-slate-500">Suggested priority</dt>
-                    <dd className="font-medium">
-                      {label(ticket.ai_priority!)}
-                      {overridden(ticket.priority, ticket.ai_priority) && (
-                        <span className="ml-1 text-amber-700">(overridden)</span>
-                      )}
-                    </dd>
-                  </div>
-                </dl>
-              </>
-            ) : (
-              <p className="text-sm text-slate-500">
-                AI analysis was unavailable when this ticket was created. Default category and
-                priority were applied.
-              </p>
+    <div className="animate-fade-in space-y-6">
+      <PageHeader
+        back={BACK}
+        title={
+          <>
+            <span className="text-muted tabular-nums">#{ticket.id}</span> {ticket.title}
+          </>
+        }
+        description={
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <div className="flex flex-wrap gap-1.5">
+              <StatusBadge value={ticket.status} />
+              <PriorityBadge value={ticket.priority} />
+              <CategoryBadge value={ticket.category} />
+            </div>
+            <span className="inline-flex items-center gap-1.5">
+              <Clock className="size-3.5" aria-hidden />
+              Created{" "}
+              <time dateTime={ticket.created_at} title={formatDateTime(ticket.created_at)}>
+                {formatRelative(ticket.created_at)}
+              </time>
+            </span>
+            {edited && (
+              <span className="inline-flex items-center gap-1.5">
+                <History className="size-3.5" aria-hidden />
+                Updated{" "}
+                <time dateTime={ticket.updated_at} title={formatDateTime(ticket.updated_at)}>
+                  {formatRelative(ticket.updated_at)}
+                </time>
+              </span>
             )}
-          </section>
+          </div>
+        }
+      />
 
-          <section className="card">
-            <h2 className="mb-2 text-sm font-semibold">Description</h2>
-            <p className="whitespace-pre-wrap text-sm text-slate-700">{ticket.description}</p>
+      <div className="grid items-start gap-6 lg:grid-cols-3">
+        <div className="space-y-6 lg:col-span-2">
+          <AiAnalysisCard ticket={ticket} />
+          <section aria-labelledby="description-heading" className="card">
+            <h2 id="description-heading" className="text-sm font-semibold">
+              Description
+            </h2>
+            <p className="mt-3 max-w-prose text-[15px] leading-relaxed whitespace-pre-wrap text-foreground/90">
+              {ticket.description}
+            </p>
           </section>
         </div>
 
-        <aside className="card h-fit space-y-4">
-          <h2 className="text-sm font-semibold">Manage</h2>
-          <Select id="status" labelText="Status" value={ticket.status} options={STATUSES} disabled={saving} onChange={(v) => update({ status: v as Ticket["status"] })} />
-          <Select id="category" labelText="Category" value={ticket.category} options={CATEGORIES} disabled={saving} onChange={(v) => update({ category: v as Ticket["category"] })} />
-          <Select id="priority" labelText="Priority" value={ticket.priority} options={PRIORITIES} disabled={saving} onChange={(v) => update({ priority: v as Ticket["priority"] })} />
-          {saving && <p className="text-xs text-slate-500">Saving…</p>}
-          <button className="btn-danger w-full" onClick={remove} disabled={saving}>
-            Delete ticket
-          </button>
+        <aside className="space-y-6 lg:sticky lg:top-24">
+          {/* key: reset the draft whenever the saved ticket changes */}
+          <TicketManagePanel key={ticket.updated_at} ticket={ticket} onSaved={setTicket} />
+          <DeleteTicketCard ticket={ticket} />
         </aside>
       </div>
     </div>

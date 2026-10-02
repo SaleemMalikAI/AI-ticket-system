@@ -1,19 +1,24 @@
 "use client";
 
+import { Inbox, Plus, SearchX, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
-import { Badge } from "@/components/ui/Badge";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { EmptyState } from "@/components/ui/EmptyState";
 import { ErrorBox } from "@/components/ui/ErrorBox";
-import { Select } from "@/components/ui/Select";
 import { Links } from "@/constants/links";
-import { ALL_LABEL, CATEGORIES, FILTER_KEYS, PRIORITIES, STATUSES } from "@/constants/ticket";
+import { FILTER_KEYS } from "@/constants/ticket";
+import { LIST_STAGGER_MAX_ITEMS, LIST_STAGGER_MS } from "@/constants/ui";
 import { restApi } from "@/rest-api";
-import type { TicketFilters, TicketList } from "@/types/ticket";
+import type { TicketFilters as Filters, TicketList } from "@/types/ticket";
 import { errorText } from "@/utilities/errors";
-import { formatDateTime, label } from "@/utilities/format";
-import { buildPath } from "@/utilities/url";
+
+import { TicketCard } from "./TicketCard";
+import { TicketFilters } from "./TicketFilters";
+import { TicketListSkeleton } from "./TicketListSkeleton";
 
 export function TicketListView() {
   const router = useRouter();
@@ -21,9 +26,10 @@ export function TicketListView() {
   const searchParams = useSearchParams();
 
   // Filters live in the URL so they survive refresh and are shareable
-  const filters: TicketFilters = Object.fromEntries(
+  const filters: Filters = Object.fromEntries(
     FILTER_KEYS.map((k) => [k, searchParams.get(k) || undefined]),
   );
+  const activeCount = FILTER_KEYS.filter((k) => filters[k]).length;
 
   const [data, setData] = useState<TicketList | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,63 +57,60 @@ export function TicketListView() {
     const params = new URLSearchParams(searchParams.toString());
     if (value) params.set(key, value);
     else params.delete(key);
-    router.replace(`${pathname}${params.size ? `?${params}` : ""}`);
+    router.replace(`${pathname}${params.size ? `?${params}` : ""}`, { scroll: false });
   }
 
-  const hasFilters = FILTER_KEYS.some((k) => filters[k]);
+  const clearFilters = () => router.replace(pathname, { scroll: false });
+
+  const summary = data
+    ? `${data.total} ${data.total === 1 ? "ticket" : "tickets"}${activeCount ? " match your filters" : ""} · triaged by AI`
+    : "Loading tickets…";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-baseline justify-between">
-        <h1 className="text-2xl font-semibold">Tickets</h1>
-        {data && <span className="text-sm text-slate-500">{data.total} total</span>}
-      </div>
+      <PageHeader title="Tickets" description={<span aria-live="polite">{summary}</span>} />
 
-      <div className="card grid gap-4 sm:grid-cols-4">
-        <Select id="f-status" labelText="Status" value={filters.status ?? ""} options={STATUSES} emptyLabel={ALL_LABEL} onChange={(v) => setFilter("status", v)} />
-        <Select id="f-category" labelText="Category" value={filters.category ?? ""} options={CATEGORIES} emptyLabel={ALL_LABEL} onChange={(v) => setFilter("category", v)} />
-        <Select id="f-priority" labelText="Priority" value={filters.priority ?? ""} options={PRIORITIES} emptyLabel={ALL_LABEL} onChange={(v) => setFilter("priority", v)} />
-        <div className="flex items-end">
-          <button className="btn-secondary w-full" disabled={!hasFilters} onClick={() => router.replace(pathname)}>
-            Clear filters
-          </button>
-        </div>
-      </div>
+      <TicketFilters filters={filters} activeCount={activeCount} onChange={setFilter} onClear={clearFilters} />
 
       {error && <ErrorBox message={error} onRetry={load} />}
 
-      {loading && !data && <p className="text-sm text-slate-500">Loading tickets…</p>}
+      {loading && !data && !error && <TicketListSkeleton />}
 
-      {data && data.items.length === 0 && !error && (
-        <div className="card text-center text-sm text-slate-500">
-          {hasFilters ? "No tickets match these filters." : "No tickets yet."}{" "}
-          <Link href={Links.NEW_TICKET} className="font-medium text-slate-900 underline">
-            Create one
-          </Link>
-        </div>
-      )}
+      {data && data.items.length === 0 && !error &&
+        (activeCount ? (
+          <EmptyState
+            icon={SearchX}
+            title="No matching tickets"
+            description="Nothing matches these filters. Try a different status, category or priority."
+            action={
+              <Button variant="secondary" icon={<X />} onClick={clearFilters}>
+                Clear filters
+              </Button>
+            }
+          />
+        ) : (
+          <EmptyState
+            icon={Inbox}
+            title="No tickets yet"
+            description="Create your first ticket. AI will summarize it and suggest a category and priority."
+            action={
+              <Link href={Links.NEW_TICKET} className={buttonClasses("primary")}>
+                <Plus aria-hidden />
+                Create ticket
+              </Link>
+            }
+          />
+        ))}
 
       {data && data.items.length > 0 && (
-        <ul className={`space-y-3 transition-opacity ${loading ? "opacity-50" : ""}`}>
-          {data.items.map((t) => (
-            <li key={t.id}>
-              <Link href={buildPath(Links.TICKET_DETAIL, { id: t.id })} className="card block hover:border-slate-400">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="font-medium">
-                    <span className="text-slate-400">#{t.id}</span> {t.title}
-                  </h2>
-                  <div className="flex gap-2">
-                    <Badge value={t.status} />
-                    <Badge value={t.priority} />
-                  </div>
-                </div>
-                <p className="mt-2 line-clamp-2 text-sm text-slate-600">
-                  {t.ai_summary ?? t.description}
-                </p>
-                <p className="mt-2 text-xs text-slate-400">
-                  {label(t.category)} · {formatDateTime(t.created_at)}
-                </p>
-              </Link>
+        <ul aria-busy={loading} className={`grid gap-3 transition-opacity duration-200 ${loading ? "opacity-60" : ""}`}>
+          {data.items.map((t, i) => (
+            <li
+              key={t.id}
+              className="animate-fade-in"
+              style={{ animationDelay: `${Math.min(i, LIST_STAGGER_MAX_ITEMS) * LIST_STAGGER_MS}ms` }}
+            >
+              <TicketCard ticket={t} />
             </li>
           ))}
         </ul>

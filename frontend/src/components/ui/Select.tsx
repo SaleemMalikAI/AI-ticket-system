@@ -1,3 +1,5 @@
+import { ChevronDown } from "lucide-react";
+
 import { label } from "@/utilities/format";
 
 interface Props {
@@ -13,23 +15,29 @@ interface Props {
 export function Select({ id, labelText, value, options, emptyLabel, onChange, disabled }: Props) {
   return (
     <div>
-      <label htmlFor={id} className="mb-1 block text-xs font-medium text-slate-600">
+      <label htmlFor={id} className="label">
         {labelText}
       </label>
-      <select
-        id={id}
-        className="input"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-      >
-        {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {label(o)}
-          </option>
-        ))}
-      </select>
+      <div className="relative">
+        <select
+          id={id}
+          className="input h-11 appearance-none pr-9"
+          value={value}
+          disabled={disabled}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          {emptyLabel !== undefined && <option value="">{emptyLabel}</option>}
+          {options.map((o) => (
+            <option key={o} value={o}>
+              {label(o)}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute top-1/2 right-3 size-4 -translate-y-1/2 text-muted"
+          aria-hidden
+        />
+      </div>
     </div>
   );
 }

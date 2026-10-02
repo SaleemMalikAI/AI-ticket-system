@@ -1,26 +1,30 @@
+import type { ReactNode } from "react";
+
+import { CATEGORY_META, PRIORITY_META, STATUS_META, type BadgeMeta } from "@/constants/ticket-meta";
+import type { Category, Priority, Status } from "@/types/ticket";
 import { label } from "@/utilities/format";
 
-const COLORS: Record<string, string> = {
-  // priority
-  low: "bg-slate-100 text-slate-700",
-  medium: "bg-blue-100 text-blue-800",
-  high: "bg-orange-100 text-orange-800",
-  urgent: "bg-red-100 text-red-800",
-  // status
-  open: "bg-emerald-100 text-emerald-800",
-  in_progress: "bg-amber-100 text-amber-800",
-  resolved: "bg-sky-100 text-sky-800",
-  closed: "bg-slate-200 text-slate-700",
-};
-
-export function Badge({ value }: { value: string }) {
+function Pill({ meta, srPrefix, children }: { meta: BadgeMeta; srPrefix: string; children: ReactNode }) {
+  const Icon = meta.icon;
   return (
     <span
-      className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
-        COLORS[value] ?? "bg-violet-100 text-violet-800"
-      }`}
+      className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ring-inset ${meta.className}`}
     >
-      {label(value)}
+      <Icon className="size-3.5" aria-hidden />
+      <span className="sr-only">{srPrefix}: </span>
+      {children}
     </span>
   );
 }
+
+export const StatusBadge = ({ value }: { value: Status }) => (
+  <Pill meta={STATUS_META[value]} srPrefix="Status">{label(value)}</Pill>
+);
+
+export const PriorityBadge = ({ value }: { value: Priority }) => (
+  <Pill meta={PRIORITY_META[value]} srPrefix="Priority">{label(value)}</Pill>
+);
+
+export const CategoryBadge = ({ value }: { value: Category }) => (
+  <Pill meta={CATEGORY_META[value]} srPrefix="Category">{label(value)}</Pill>
+);
