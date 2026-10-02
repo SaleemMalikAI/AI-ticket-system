@@ -27,7 +27,7 @@ export const HERO = {
   titleHighlight: "triaged by AI",
   titleTail: "in seconds.",
   subtitle:
-    "Describe the problem in plain words. AI writes a one-line summary and suggests the category and priority, and your team always has the final say.",
+    "Describe the problem in plain words. AI writes a short summary and suggests the category and priority, and your team always has the final say.",
   highlights: ["Summary, category and priority", "Override anything", "REST API included"],
 } as const;
 
@@ -60,8 +60,8 @@ export const HOW_IT_WORKS: IconItem[] = [
 export const FEATURES: IconItem[] = [
   {
     icon: FileText,
-    title: "One-line AI summaries",
-    text: "Every ticket gets a short summary, so the whole queue can be scanned at a glance.",
+    title: "Clear AI summaries",
+    text: "Every ticket gets a 3 to 5 sentence summary: the problem, its impact, key details and what the customer wants.",
   },
   {
     icon: Tags,
@@ -112,7 +112,8 @@ export const SAMPLE_TICKET = {
   title: "Charged twice for the Pro plan",
   description:
     "My card was charged twice for the Pro plan this month. Please refund one of the charges.",
-  ai_summary: "Customer was double-charged for the Pro plan and wants one charge refunded.",
+  ai_summary:
+    "The customer was charged twice for the Pro plan this month. Only their own subscription is affected. They want one of the two charges refunded.",
   category: "billing" as Category,
   priority: "high" as Priority,
 };
@@ -121,7 +122,7 @@ export const FAQ: { question: string; answer: string }[] = [
   {
     question: "What exactly does the AI do?",
     answer:
-      "When a ticket is created, the AI reads the title and description and returns a one-sentence summary plus a suggested category and priority. Nothing else about the ticket is changed.",
+      "When a ticket is created, the AI reads the title and description and returns a 3 to 5 sentence summary (the problem, who is affected, key details and what the customer is asking for) plus a suggested category and priority. Nothing else about the ticket is changed.",
   },
   {
     question: "Can I change what the AI picked?",

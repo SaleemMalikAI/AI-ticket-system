@@ -7,7 +7,6 @@ The LLM is replaced with a fake so tests are fast and deterministic.
 
 import json
 import os
-from collections.abc import Sequence
 
 import pytest
 from httpx import ASGITransport, AsyncClient
@@ -40,25 +39,26 @@ class FakeAnalyzer:
 
 
 class FakeAssistantLLM:
-    """Stands in for the assistant's planner + summarizer.
+    """Stands in for the assistant's planner + answer writer.
 
     `plan` is what plan_query returns: a dict (sent as JSON), a raw string,
-    or None (= LLM unavailable). `summary` is what summarize returns.
+    or None (= LLM unavailable). `reply` is what compose_answer returns;
+    None makes the service fall back to its templated answer.
     """
 
     def __init__(self):
         self.plan: dict | str | None = {"intent": "list"}
-        self.summary: str | None = None
+        self.reply: str | None = None
         self.questions: list[str] = []
-        self.summarized_ids: list[int] = []
+        self.facts: dict | None = None
 
     async def plan_query(self, question: str) -> str | None:
         self.questions.append(question)
         return json.dumps(self.plan) if isinstance(self.plan, dict) else self.plan
 
-    async def summarize(self, question: str, tickets: Sequence) -> str | None:
-        self.summarized_ids = [t.id for t in tickets]
-        return self.summary
+    async def compose_answer(self, question: str, facts: dict) -> str | None:
+        self.facts = facts
+        return self.reply
 
 
 @pytest.fixture

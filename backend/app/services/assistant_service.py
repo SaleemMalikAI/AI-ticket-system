@@ -1,15 +1,16 @@
 """Ask AI: answer natural-language questions about tickets.
 
 Flow: question -> LLM returns a JSON QueryPlan -> Pydantic validates it ->
-the backend runs it with the ticket repository -> templated answer.
-The LLM never writes SQL; for "summarize" it only sees the fetched tickets'
-id / title / AI summary, and every #id it cites must be one of them.
+the backend runs it with the ticket repository -> the LLM turns ONLY those
+results into a conversational reply -> the reply is checked against them.
+
+The LLM never writes SQL. The reply must use the real total and may only cite
+tickets that were fetched; otherwise a templated answer is used instead.
 """
 
 import json
 import logging
 import re
-from collections.abc import Sequence
 from dataclasses import dataclass, field
 from typing import Protocol
 
@@ -17,8 +18,8 @@ from pydantic import ValidationError
 
 from app.constants.assistant import (
     DEFAULT_GROUP_BY,
+    ANSWER_SYSTEM_PROMPT,
     PLANNER_SYSTEM_PROMPT,
-    SUMMARIZER_SYSTEM_PROMPT,
     AssistantIntent,
     AssistantMessages,
     DateRange,
@@ -37,6 +38,7 @@ from app.utilities.text import label
 logger = logging.getLogger(__name__)
 
 _CITATION = re.compile(r"#(\d+)")
+_NOTHING = re.compile(r"\b(no|none|zero|0)\b", re.IGNORECASE)
 _DATE_PHRASES = {
     DateRange.TODAY: "from today",
     DateRange.LAST_7_DAYS: "from the last 7 days",
@@ -49,7 +51,7 @@ class AssistantLLM(Protocol):
 
     async def plan_query(self, question: str) -> str | None: ...
 
-    async def summarize(self, question: str, tickets: Sequence[Ticket]) -> str | None: ...
+    async def compose_answer(self, question: str, facts: dict) -> str | None: ...
 
 
 def wrap_question(question: str) -> str:
@@ -72,16 +74,15 @@ class GroqAssistantLLM:
             temperature=0,
         )
 
-    async def summarize(self, question: str, tickets: Sequence[Ticket]) -> str | None:
-        # Grounding: the model sees ONLY these fields of the fetched tickets
-        facts = [{"id": t.id, "title": t.title, "summary": t.ai_summary} for t in tickets]
+    async def compose_answer(self, question: str, facts: dict) -> str | None:
+        # Grounding: the model sees ONLY the query results, never the database
         return await chat_completion(
             self.settings,
             [
-                {"role": "system", "content": SUMMARIZER_SYSTEM_PROMPT},
+                {"role": "system", "content": ANSWER_SYSTEM_PROMPT},
                 {
                     "role": "user",
-                    "content": f"<tickets>{json.dumps(facts)}</tickets>\n{wrap_question(question)}",
+                    "content": f"<facts>{json.dumps(facts)}</facts>\n{wrap_question(question)}",
                 },
             ],
             json_mode=False,
@@ -97,16 +98,32 @@ def parse_plan(raw: str) -> QueryPlan | None:
         return None
 
 
-def grounded_summary(text: str | None, tickets: Sequence[Ticket]) -> str | None:
-    """Accept a summary only if it cites at least one ticket and only fetched ones."""
+def grounded_reply(text: str | None, plan: QueryPlan, result: "PlanResult") -> str | None:
+    """Accept the LLM's reply only if it sticks to the query results.
+
+    - every #id it cites must be a fetched ticket
+    - a summary must cite at least one ticket
+    - otherwise it must state the real total (or say "no/none" when it is 0)
+    """
     if not text or not text.strip():
         return None
+    text = text.strip()
     cited = {int(n) for n in _CITATION.findall(text)}
-    allowed = {t.id for t in tickets}
-    if not cited or not cited <= allowed:
-        logger.warning("Rejected ungrounded summary: cited=%s allowed=%s", cited, allowed)
+    fetched = {t.id for t in result.tickets}
+
+    if not cited <= fetched:
+        ok = False
+    elif plan.intent is AssistantIntent.SUMMARIZE and result.tickets:
+        ok = bool(cited)
+    elif result.total == 0:
+        ok = bool(_NOTHING.search(text))
+    else:
+        ok = re.search(rf"\b{result.total}\b", text) is not None
+
+    if not ok:
+        logger.warning("Rejected ungrounded reply: cited=%s fetched=%s total=%s", cited, fetched, result.total)
         return None
-    return text.strip()
+    return text
 
 
 def describe(plan: QueryPlan, count: int) -> str:
@@ -173,7 +190,8 @@ class AssistantService:
         stats = await self.repository.count_by(plan.group_by or DEFAULT_GROUP_BY, where)
         return PlanResult(total=sum(stats.values()), stats=stats)
 
-    async def build_answer(self, question: str, plan: QueryPlan, result: PlanResult) -> str:
+    def template_answer(self, plan: QueryPlan, result: PlanResult) -> str:
+        """Plain answer built only from the query results (used when the LLM reply is unusable)."""
         total = result.total
 
         if plan.intent is AssistantIntent.COUNT:
@@ -189,14 +207,40 @@ class AssistantService:
         if total == 0:
             return f"No {describe(plan, 0)} found."
 
-        list_answer = f"Found {total} {describe(plan, total)}."
+        answer = f"Found {total} {describe(plan, total)}."
         if total > len(result.tickets):
-            list_answer += f" Showing the {len(result.tickets)} most recent."
+            answer += f" Showing the {len(result.tickets)} most recent."
+        return answer
 
-        if plan.intent is AssistantIntent.SUMMARIZE:
-            summary = grounded_summary(
-                await self.llm.summarize(question, result.tickets), result.tickets
-            )
-            return summary or f"{list_answer} {AssistantMessages.SUMMARY_UNAVAILABLE}"
+    @staticmethod
+    def facts(plan: QueryPlan, result: PlanResult) -> dict:
+        """Everything the reply may be based on: totals, groups and fetched tickets."""
+        return {
+            "intent": plan.intent.value,
+            "matching": describe(plan, result.total),
+            "total": result.total,
+            "stats": result.stats,
+            "tickets": [
+                {
+                    "id": t.id,
+                    "title": t.title,
+                    "summary": t.ai_summary,
+                    "status": t.status.value,
+                    "priority": t.priority.value,
+                    "category": t.category.value,
+                }
+                for t in result.tickets
+            ],
+        }
 
-        return list_answer
+    async def build_answer(self, question: str, plan: QueryPlan, result: PlanResult) -> str:
+        """Conversational reply from the LLM, grounded in the results; template as fallback."""
+        reply = await self.llm.compose_answer(question, self.facts(plan, result))
+        grounded = grounded_reply(reply, plan, result)
+        if grounded:
+            return grounded
+
+        fallback = self.template_answer(plan, result)
+        if plan.intent is AssistantIntent.SUMMARIZE and result.total:
+            fallback += f" {AssistantMessages.SUMMARY_UNAVAILABLE}"
+        return fallback
