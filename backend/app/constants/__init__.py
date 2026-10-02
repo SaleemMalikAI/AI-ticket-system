@@ -1,4 +1,4 @@
-from app.constants.api_routes import ApiRoutes, ApiTags, TicketPaths
+from app.constants.api_routes import ApiRoutes, ApiTags, AssistantPaths, TicketPaths
 from app.constants.messages import ErrorMessages
 from app.constants.ticket import (
     DEFAULT_CATEGORY,
@@ -15,6 +15,7 @@ __all__ = [
     "DEFAULT_STATUS",
     "ApiRoutes",
     "ApiTags",
+    "AssistantPaths",
     "Category",
     "ErrorMessages",
     "Priority",

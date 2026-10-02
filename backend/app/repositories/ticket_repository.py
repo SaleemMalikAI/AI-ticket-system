@@ -89,6 +89,9 @@ class TicketRepository:
         )
         return list(result), total or 0
 
+    async def count(self, filters: Sequence[ColumnElement[bool]]) -> int:
+        return await self.session.scalar(select(func.count()).select_from(Ticket).where(*filters)) or 0
+
     async def count_by(
         self, group_by: str, filters: Sequence[ColumnElement[bool]]
     ) -> dict[str, int]:
