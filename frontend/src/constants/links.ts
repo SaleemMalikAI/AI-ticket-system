@@ -7,6 +7,7 @@ export enum Links {
   TICKETS = "/tickets",
   NEW_TICKET = "/tickets/new",
   TICKET_DETAIL = "/tickets/:id",
+  ASK = "/ask",
   NOT_FOUND = "/not-found", // middleware rewrites invalid URLs here (renders a 404)
   SITEMAP = "/sitemap.xml",
   ROBOTS = "/robots.txt",

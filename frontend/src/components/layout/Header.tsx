@@ -1,6 +1,6 @@
 "use client";
 
-import { Inbox, LifeBuoy, Plus } from "lucide-react";
+import { Inbox, LifeBuoy, Plus, Sparkles, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -9,6 +9,24 @@ import { LANDING_NAV } from "@/constants/landing";
 import { Links } from "@/constants/links";
 import { PAGES, Pages } from "@/constants/pages";
 import { SITE_NAME } from "@/constants/site";
+
+function NavLink({ href, icon: Icon, label, active }: { href: string; icon: LucideIcon; label: string; active: boolean }) {
+  return (
+    <Link
+      href={href}
+      aria-current={active ? "page" : undefined}
+      className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
+        active
+          ? "bg-primary/10 text-primary dark:text-indigo-300"
+          : "text-muted hover:bg-surface-muted hover:text-foreground"
+      }`}
+    >
+      <Icon className="size-4" aria-hidden />
+      {/* icon-only on phones; the label stays available to screen readers */}
+      <span className="sr-only sm:not-sr-only">{label}</span>
+    </Link>
+  );
+}
 
 export function Header() {
   const pathname = usePathname();
@@ -43,18 +61,8 @@ export function Header() {
         )}
 
         <div className="flex items-center gap-1 sm:gap-2">
-          <Link
-            href={Links.TICKETS}
-            aria-current={onTickets ? "page" : undefined}
-            className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-medium transition ${
-              onTickets
-                ? "bg-primary/10 text-primary dark:text-indigo-300"
-                : "text-muted hover:bg-surface-muted hover:text-foreground"
-            }`}
-          >
-            <Inbox className="size-4" aria-hidden />
-            {PAGES[Pages.TICKETS].title}
-          </Link>
+          <NavLink href={Links.TICKETS} icon={Inbox} label={PAGES[Pages.TICKETS].title} active={onTickets} />
+          <NavLink href={Links.ASK} icon={Sparkles} label={PAGES[Pages.ASK].title} active={pathname === Links.ASK} />
           {!onNewTicket && (
             <Link href={Links.NEW_TICKET} className={buttonClasses("primary", "sm")}>
               <Plus aria-hidden />

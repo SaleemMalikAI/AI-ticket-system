@@ -8,6 +8,7 @@ export enum Pages {
   TICKETS = "TICKETS",
   NEW_TICKET = "NEW_TICKET",
   TICKET_DETAIL = "TICKET_DETAIL",
+  ASK = "ASK",
   NOT_FOUND = "NOT_FOUND",
 }
 
@@ -46,6 +47,14 @@ export const PAGES: Record<Pages, PageConfig> = {
     description: "Ticket details, AI analysis, and status, category and priority management.",
     // tickets hold customer data: keep them out of search engines
     indexable: false,
+  },
+  [Pages.ASK]: {
+    link: Links.ASK,
+    title: "Ask AI",
+    description:
+      "Ask questions about your tickets in plain English, like 'open urgent tickets' or 'tickets by category', and get answers with the matching tickets.",
+    indexable: true,
+    sitemap: { changeFrequency: "monthly", priority: 0.7 },
   },
   [Pages.NOT_FOUND]: {
     link: Links.NOT_FOUND,
