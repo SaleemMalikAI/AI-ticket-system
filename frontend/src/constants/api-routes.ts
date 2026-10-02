@@ -6,6 +6,7 @@ export enum ApiRoutes {
   HEALTH = "/health",
   TICKETS = "/api/tickets",
   TICKET_BY_ID = "/api/tickets/:id",
+  ASSISTANT_ASK = "/api/assistant/ask",
 }
 
 export enum HttpMethod {

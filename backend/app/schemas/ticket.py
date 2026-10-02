@@ -8,6 +8,7 @@ from app.constants.ticket import (
     DESCRIPTION_MIN_LENGTH,
     LIST_DEFAULT_LIMIT,
     LIST_MAX_LIMIT,
+    SEARCH_MAX_LENGTH,
     TITLE_MAX_LENGTH,
     TITLE_MIN_LENGTH,
     Category,
@@ -48,8 +49,14 @@ class TicketListParams(BaseModel):
     status: Status | None = None
     category: Category | None = None
     priority: Priority | None = None
+    q: str | None = Field(None, max_length=SEARCH_MAX_LENGTH, description="Text search")
     limit: int = Field(LIST_DEFAULT_LIMIT, ge=1, le=LIST_MAX_LIMIT)
     offset: int = Field(0, ge=0)
+
+    @field_validator("q")
+    @classmethod
+    def blank_to_none(cls, v: str | None) -> str | None:
+        return (v.strip() or None) if v else None
 
 
 class TicketRead(BaseModel):

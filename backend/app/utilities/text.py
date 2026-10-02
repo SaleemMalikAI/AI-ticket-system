@@ -12,3 +12,8 @@ def strip_not_blank(value: str) -> str:
 def normalize_choice(value: str) -> str:
     """Lenient matching of LLM output: "Feature Request" -> "feature_request"."""
     return value.strip().lower().replace(" ", "_")
+
+
+def label(value: str) -> str:
+    """Human-readable enum value: "in_progress" -> "In progress"."""
+    return value.replace("_", " ").capitalize()

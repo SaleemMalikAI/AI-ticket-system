@@ -38,4 +38,6 @@ export interface TicketFilters {
   status?: Status;
   category?: Category;
   priority?: Priority;
+  /** text search in title, description and AI summary */
+  q?: string;
 }

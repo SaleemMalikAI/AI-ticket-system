@@ -1,4 +1,5 @@
 export * from "./api-routes";
+export * from "./assistant";
 export * from "./landing";
 export * from "./links";
 export * from "./messages";

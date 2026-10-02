@@ -13,3 +13,7 @@ class AppError(Exception):
 
 class NotFoundError(AppError):
     status_code = status.HTTP_404_NOT_FOUND
+
+
+class AIUnavailableError(AppError):
+    status_code = status.HTTP_503_SERVICE_UNAVAILABLE

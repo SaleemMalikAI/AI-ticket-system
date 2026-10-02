@@ -9,17 +9,12 @@ import json
 import logging
 from typing import Protocol
 
-import httpx
 from pydantic import ValidationError
 
-from app.constants.ai import (
-    LLM_CHAT_COMPLETIONS_PATH,
-    LLM_RESPONSE_FORMAT,
-    LLM_TEMPERATURE,
-    SYSTEM_PROMPT,
-)
+from app.constants.ai import SYSTEM_PROMPT
 from app.core.config import Settings
 from app.schemas.ai import AISuggestion
+from app.services.llm_client import chat_completion
 from app.utilities.text import normalize_choice
 
 logger = logging.getLogger(__name__)
@@ -49,30 +44,14 @@ class LLMTicketAnalyzer:
         self.settings = settings
 
     async def analyze(self, title: str, description: str) -> AISuggestion | None:
-        if not self.settings.llm_api_key:
-            logger.warning("LLM_API_KEY not set; skipping AI analysis")
-            return None
-
-        payload = {
-            "model": self.settings.llm_model,
-            "temperature": LLM_TEMPERATURE,
-            "response_format": LLM_RESPONSE_FORMAT,
-            "messages": [
+        content = await chat_completion(
+            self.settings,
+            [
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": f"Title: {title}\n\nDescription: {description}"},
             ],
-        }
-        try:
-            async with httpx.AsyncClient(timeout=self.settings.llm_timeout_seconds) as client:
-                resp = await client.post(
-                    f"{self.settings.llm_base_url}{LLM_CHAT_COMPLETIONS_PATH}",
-                    headers={"Authorization": f"Bearer {self.settings.llm_api_key}"},
-                    json=payload,
-                )
-                resp.raise_for_status()
-                content = resp.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError, ValueError) as exc:
-            logger.error("AI request failed: %s", exc)
+        )
+        if content is None:
             return None
 
         suggestion = parse_suggestion(content)
