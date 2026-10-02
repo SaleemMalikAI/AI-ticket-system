@@ -7,10 +7,7 @@ import type { AskResponse } from "@/types/assistant";
 import { buildListLink } from "@/utilities/assistant";
 
 import { AnswerText } from "./AnswerText";
-import { PlanChips } from "./PlanChips";
-import { StatsBadges } from "./StatsBadges";
 import { SuggestedQuestions } from "./SuggestedQuestions";
-import { TicketMiniCard } from "./TicketMiniCard";
 
 function AiAvatar() {
   return (
@@ -83,37 +80,23 @@ interface AnswerProps {
   disabled: boolean;
 }
 
+/** A chat reply: the AI's natural-language answer, nothing else to read through. */
 export function AnswerBubble({ response, onPick, disabled }: AnswerProps) {
-  const { answer, plan, tickets, stats } = response;
+  const { answer, plan } = response;
 
   return (
     <AiRow label="AI answer">
-      <div className="space-y-4 rounded-2xl rounded-tl-md border border-border bg-surface px-4 py-3.5 shadow-sm sm:px-5">
+      <div className="w-fit max-w-full space-y-3 rounded-2xl rounded-tl-md border border-border bg-surface px-4 py-3 shadow-sm sm:px-5">
         <AnswerText text={answer} />
 
-        {stats && Object.keys(stats).length > 0 && <StatsBadges stats={stats} groupBy={plan?.group_by ?? null} />}
-
-        {tickets.length > 0 && (
-          <ul className="space-y-2">
-            {tickets.map((t) => (
-              <li key={t.id}>
-                <TicketMiniCard ticket={t} />
-              </li>
-            ))}
-          </ul>
-        )}
-
         {plan ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-3">
-            <PlanChips plan={plan} />
-            <Link
-              href={buildListLink(plan)}
-              className="inline-flex items-center gap-1 text-sm font-semibold text-primary hover:underline dark:text-indigo-300"
-            >
-              Open in list view
-              <ArrowUpRight className="size-4" aria-hidden />
-            </Link>
-          </div>
+          <Link
+            href={buildListLink(plan)}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline dark:text-indigo-300"
+          >
+            View in ticket list
+            <ArrowUpRight className="size-3.5" aria-hidden />
+          </Link>
         ) : (
           // the question could not be planned: offer examples that work
           <SuggestedQuestions onPick={onPick} disabled={disabled} className="border-t border-border pt-3" />
